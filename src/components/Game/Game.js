@@ -10,6 +10,13 @@ import { copyArray, getDayOfTheYear, getDayKey } from '../../utils';
 // async storage
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import EndScreen from '../EndScreen';
+// React Native Reanimated
+import Animated, {
+  SlideInDown,
+  SlideInLeft,
+  ZoomIn,
+  FlipInEasyY,
+} from 'react-native-reanimated';
 
 const NUMBER_OF_TRIES = 6;
 
@@ -17,12 +24,13 @@ const dayOfTheYear = getDayOfTheYear();
 
 const dayKey = getDayKey();
 
-
 const Game = () => {
   // AsyncStorage.removeItem("@game");
   const word = words[dayOfTheYear];
   const letters = word.split(''); // ['h', 'e', 'l', 'l', 'o']
-  const [rows, setRows] = useState(new Array(NUMBER_OF_TRIES).fill(new Array(letters.length).fill('')));
+  const [rows, setRows] = useState(
+    new Array(NUMBER_OF_TRIES).fill(new Array(letters.length).fill('')),
+  );
   const [curRow, setCurRow] = useState(0);
   const [curCol, setCurCol] = useState(0);
   const [gameState, setGameState] = useState('playing'); // won, lost, playing
@@ -56,14 +64,16 @@ const Game = () => {
     try {
       // we need to read the state and check
       // Lấy state ra xong parse vì nó là String
-      const existingStateString = await AsyncStorage.getItem("@game");
-      const existingState = existingStateString ? JSON.parse(existingStateString) : {};
-      existingState[dayKey] = dataForToday
+      const existingStateString = await AsyncStorage.getItem('@game');
+      const existingState = existingStateString
+        ? JSON.parse(existingStateString)
+        : {};
+      existingState[dayKey] = dataForToday;
 
       const dataString = JSON.stringify(existingState);
       await AsyncStorage.setItem('@game', dataString);
     } catch (error) {
-      console.log("Failed to write data to async storage");
+      console.log('Failed to write data to async storage');
     }
   };
 
@@ -71,17 +81,17 @@ const Game = () => {
     const dataString = await AsyncStorage.getItem('@game');
     // for some reasons the data is corrupt => use try catch
     try {
-      const data = JSON.parse(dataString)
-      const day = data[dayKey]
-      setRows(day.rows)
-      setCurRow(day.curRow)
-      setCurCol(day.curCol)
-      setGameState(day.gameState)
+      const data = JSON.parse(dataString);
+      const day = data[dayKey];
+      setRows(day.rows);
+      setCurRow(day.curRow);
+      setCurCol(day.curCol);
+      setGameState(day.gameState);
     } catch (error) {
       console.log("Couldn't parse the state", error);
     }
-    setLoaded(true)
-  }
+    setLoaded(true);
+  };
 
   const checkGameState = () => {
     if (checkIfWon() && gameState !== 'won') {
@@ -162,36 +172,65 @@ const Game = () => {
   const greenCaps = getAllLettersWithColor(colors.primary);
   const yellowCaps = getAllLettersWithColor(colors.secondary);
   const greyCaps = getAllLettersWithColor(colors.darkgrey);
+  const getCellStyle = (i, j) => [
+    styles.cell,
+    {
+      borderColor: isCellActive(i, j) ? colors.grey : colors.darkgrey,
+      backgroundColor: getCellBGColor(i, j),
+    },
+  ];
 
   if (!loaded) {
-    return (<ActivityIndicator/>)
+    return <ActivityIndicator />;
   }
   if (gameState !== 'playing') {
-    return (<EndScreen won={gameState == 'won'} rows={rows} getCellBGColor={getCellBGColor}/>)
+    return (
+      <EndScreen
+        won={gameState == 'won'}
+        rows={rows}
+        getCellBGColor={getCellBGColor}
+      />
+    );
   }
 
   return (
     <>
       <ScrollView style={styles.map}>
         {rows.map((row, i) => (
-          <View key={`row-${i}`} style={styles.row}>
+          <Animated.View
+            entering={SlideInLeft.delay(i * 300)}
+            key={`row-${i}`}
+            style={styles.row}
+          >
+            {/* separate like this to easy animate each cell */}
             {row.map((letter, j) => (
-              <View
-                key={`cell-${i}-${j}`}
-                style={[
-                  styles.cell,
-                  {
-                    borderColor: isCellActive(i, j)
-                      ? colors.grey
-                      : colors.darkgrey,
-                    backgroundColor: getCellBGColor(i, j),
-                  },
-                ]}
-              >
-                <Text style={styles.cellText}>{letter.toUpperCase()}</Text>
-              </View>
+              <>
+                {i < curRow && (
+                  <Animated.View
+                    entering={FlipInEasyY.delay(j * 100)}
+                    key={`cell-color-${i}-${j}`}
+                    style={getCellStyle(i, j)}
+                  >
+                    <Text style={styles.cellText}>{letter.toUpperCase()}</Text>
+                  </Animated.View>
+                )}
+                {i == curRow && !!letter && (
+                  <Animated.View
+                    entering={ZoomIn}
+                    key={`cell-active-${i}-${j}`}
+                    style={getCellStyle(i, j)}
+                  >
+                    <Text style={styles.cellText}>{letter.toUpperCase()}</Text>
+                  </Animated.View>
+                )}
+                {!letter && (
+                  <View key={`cell-${i}-${j}`} style={getCellStyle(i, j)}>
+                    <Text style={styles.cellText}>{letter.toUpperCase()}</Text>
+                  </View>
+                )}
+              </>
             ))}
-          </View>
+          </Animated.View>
         ))}
       </ScrollView>
 
